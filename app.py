@@ -20,7 +20,7 @@ with col1:
     st.image(container_logo, width=150)
 
 with col2:
-    st.title("📦 Container Filling Industrial Dashboard")
+    st.title(" Container Filling Industrial Dashboard")
     st.caption("Packing Summary by Model & Type")
 
 with col3:
@@ -111,7 +111,7 @@ if uploaded_file is not None:
                        ('text-align', 'center')]}
         ])
 
-    st.subheader("📊 Summary Result (Styled)")
+    st.subheader("📦 Summary Result (Styled)")
     st.dataframe(style_table(result), use_container_width=True)
 
     # =========================
