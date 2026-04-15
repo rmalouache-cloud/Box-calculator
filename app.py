@@ -17,14 +17,14 @@ stream_logo = Image.open("stream_logo.png")
 col1, col2, col3 = st.columns([1, 5, 1])
 
 with col1:
-    st.image(container_logo, width=200)
+    st.image(container_logo, width=300)
 
 with col2:
     st.title("Packing Summary by Model & Type")
     
 
 with col3:
-    st.image(stream_logo, width=200)
+    st.image(stream_logo, width=300)
 
 st.markdown("---")
 
@@ -145,9 +145,9 @@ if uploaded_file is not None:
     col1, col2, col3, col4 = st.columns(4)
 
     col1.metric("📦 Total CTN", int(result["CTN QTY"].sum()))
-    col2.metric("⚖️ Net Weight", round(result["TOTAL N W (KG)"].sum(), 2))
-    col3.metric("⚖️ Gross Weight", round(result["TOTAL G W (KG)"].sum(), 2))
-    col4.metric("📐 Volume", round(result["TOTAL VOLUME (CBM)"].sum(), 3))
+    col2.metric("⚖️ Net Weight KG", round(result["TOTAL N W (KG)"].sum(), 2))
+    col3.metric("⚖️ Gross Weight KG", round(result["TOTAL G W (KG)"].sum(), 2))
+    col4.metric("📐 Volume CBM", round(result["TOTAL VOLUME (CBM)"].sum(), 3))
 
     # =========================
     # FILE NAME (ONLY HERE APNA + ORDER)
