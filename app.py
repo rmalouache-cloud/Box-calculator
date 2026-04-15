@@ -29,6 +29,16 @@ with col3:
 st.markdown("---")
 
 # =========================
+# INPUT GLOBAL
+# =========================
+st.subheader("📝 Shipment Information")
+
+apna = st.text_input("APNA")
+order_shipment = st.text_input("Order of Shipment")
+
+st.markdown("---")
+
+# =========================
 # UPLOAD FILE
 # =========================
 uploaded_file = st.file_uploader("📥 Upload your Excel file", type=["xlsx"])
@@ -111,6 +121,12 @@ if uploaded_file is not None:
     result["LOT QTY"] = result["Model"].map(lot_qty_dict)
 
     # =========================
+    # ADD INFO INTO FILE
+    # =========================
+    result["APNA"] = apna
+    result["Order of Shipment"] = order_shipment
+
+    # =========================
     # STYLE TABLE
     # =========================
     def style_table(df):
@@ -140,6 +156,14 @@ if uploaded_file is not None:
     col4.metric("📐 Volume", round(result["TOTAL VOLUME (CBM)"].sum(), 3))
 
     # =========================
+    # FILE NAME CLEANING
+    # =========================
+    safe_apna = apna.replace(" ", "_") if apna else "NO_APNA"
+    safe_order = order_shipment.replace(" ", "_") if order_shipment else "NO_ORDER"
+
+    file_name = f"packing_summary_{safe_apna}_{safe_order}.xlsx"
+
+    # =========================
     # DOWNLOAD EXCEL
     # =========================
     output = BytesIO()
@@ -150,7 +174,7 @@ if uploaded_file is not None:
     st.download_button(
         label="📥 Download Excel Report",
         data=output.getvalue(),
-        file_name="packing_summary.xlsx",
+        file_name=file_name,
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
