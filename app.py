@@ -1,17 +1,36 @@
 import streamlit as st
 import pandas as pd
 from io import BytesIO
+from PIL import Image
 
-# ==============================
+# =========================
 # CONFIG
-# ==============================
-st.set_page_config(page_title="Packing Summary", layout="wide")
+# =========================
+st.set_page_config(page_title="Packing Dashboard", layout="wide")
 
-st.title("📦 Packing Summary by Model & Type")
+# =========================
+# LOGOS + HEADER
+# =========================
+container_logo = Image.open("conteneur_logo.png")
+stream_logo = Image.open("stream_logo.png")
 
-# ==============================
-# UPLOAD
-# ==============================
+col1, col2, col3 = st.columns([1, 5, 1])
+
+with col1:
+    st.image(container_logo, width=150)
+
+with col2:
+    st.title("📦 Container Filling Industrial Dashboard")
+    st.caption("Packing Summary by Model & Type")
+
+with col3:
+    st.image(stream_logo, width=150)
+
+st.markdown("---")
+
+# =========================
+# UPLOAD FILE
+# =========================
 uploaded_file = st.file_uploader("📥 Upload your Excel file", type=["xlsx"])
 
 if uploaded_file is not None:
@@ -26,7 +45,9 @@ if uploaded_file is not None:
         .str.replace(r"\s+", " ", regex=True)
     )
 
-    # Détection colonnes
+    # =========================
+    # DETECT COLUMNS
+    # =========================
     col_ctn = [c for c in df.columns if "CTN" in c.upper()][0]
     col_nw = [c for c in df.columns if "N W" in c.upper() or "NET" in c.upper()][0]
     col_gw = [c for c in df.columns if "G W" in c.upper() or "GROSS" in c.upper()][0]
@@ -36,9 +57,9 @@ if uploaded_file is not None:
     for col in [col_ctn, col_nw, col_gw, col_vol]:
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
-    # ==============================
+    # =========================
     # LOT INPUT
-    # ==============================
+    # =========================
     st.subheader("📥 Enter LOT Quantity per Model")
 
     models = df["Model"].unique()
@@ -47,12 +68,16 @@ if uploaded_file is not None:
     cols = st.columns(len(models))
 
     for i, model in enumerate(models):
-        lot_qty = cols[i].number_input(f"{model}", min_value=0, value=0)
-        lot_qty_dict[model] = lot_qty
+        lot_qty_dict[model] = cols[i].number_input(
+            f"{model}",
+            min_value=0,
+            value=0,
+            step=100
+        )
 
-    # ==============================
+    # =========================
     # GROUPBY
-    # ==============================
+    # =========================
     result = df.groupby(
         ["Model", "TYPE"], as_index=False
     ).agg({
@@ -70,36 +95,47 @@ if uploaded_file is not None:
         "TOTAL VOLUME (CBM)"
     ]
 
-    # Ajouter LOT
     result["LOT QTY"] = result["Model"].map(lot_qty_dict)
 
-    # ==============================
-    # DISPLAY
-    # ==============================
-    st.subheader("📊 Summary Result")
-    st.dataframe(result, use_container_width=True)
+    # =========================
+    # STYLE TABLE (BORDURES NOIRES)
+    # =========================
+    def style_table(df):
+        return df.style.set_properties(**{
+            'border': '1px solid black',
+            'text-align': 'center'
+        }).set_table_styles([
+            {'selector': 'th',
+             'props': [('border', '1px solid black'),
+                       ('background-color', '#f2f2f2'),
+                       ('text-align', 'center')]}
+        ])
 
-    # ==============================
-    # DOWNLOAD CSV (FIX FR)
-    # ==============================
-    csv = result.to_csv(index=False, sep=";").encode("utf-8")
+    st.subheader("📊 Summary Result (Styled)")
+    st.dataframe(style_table(result), use_container_width=True)
 
-    st.download_button(
-        label="📥 Download CSV (Excel FR compatible)",
-        data=csv,
-        file_name="packing_summary.csv",
-        mime="text/csv"
-    )
+    # =========================
+    # KPI
+    # =========================
+    st.subheader("📈 Global Totals")
 
-    # ==============================
-    # DOWNLOAD EXCEL (PRO 🔥)
-    # ==============================
+    col1, col2, col3, col4 = st.columns(4)
+
+    col1.metric("📦 Total CTN", int(result["CTN QTY"].sum()))
+    col2.metric("⚖️ Net Weight", round(result["TOTAL N W (KG)"].sum(), 2))
+    col3.metric("⚖️ Gross Weight", round(result["TOTAL G W (KG)"].sum(), 2))
+    col4.metric("📐 Volume", round(result["TOTAL VOLUME (CBM)"].sum(), 3))
+
+    # =========================
+    # DOWNLOAD EXCEL ONLY (PRO)
+    # =========================
     output = BytesIO()
+
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        result.to_excel(writer, index=False, sheet_name='Summary')
+        result.to_excel(writer, index=False, sheet_name="Summary")
 
     st.download_button(
-        label="📥 Download Excel (Best)",
+        label="📥 Download Excel Report",
         data=output.getvalue(),
         file_name="packing_summary.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
