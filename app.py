@@ -20,8 +20,8 @@ with col1:
     st.image(container_logo, width=200)
 
 with col2:
-    st.title("Container Filling Industrial Dashboard")
-    st.caption("Packing Summary by Model & Type")
+    st.title("Packing Summary by Model & Type")
+    
 
 with col3:
     st.image(stream_logo, width=200)
