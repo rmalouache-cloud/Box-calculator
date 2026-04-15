@@ -9,7 +9,7 @@ from PIL import Image
 st.set_page_config(page_title="Packing Dashboard", layout="wide")
 
 # =========================
-# LOGOS + HEADER
+# LOGOS + HEADER (PLUS GRANDS)
 # =========================
 container_logo = Image.open("conteneur_logo.png")
 stream_logo = Image.open("stream_logo.png")
@@ -17,14 +17,14 @@ stream_logo = Image.open("stream_logo.png")
 col1, col2, col3 = st.columns([1, 5, 1])
 
 with col1:
-    st.image(container_logo, width=150)
+    st.image(container_logo, width=200)
 
 with col2:
-    st.title(" Container Filling Industrial Dashboard")
+    st.title("Container Filling Industrial Dashboard")
     st.caption("Packing Summary by Model & Type")
 
 with col3:
-    st.image(stream_logo, width=150)
+    st.image(stream_logo, width=200)
 
 st.markdown("---")
 
@@ -46,26 +46,39 @@ if uploaded_file is not None:
     )
 
     # =========================
+    # FILTER (OPTIONAL)
+    # =========================
+    models_all = df["Model"].dropna().unique()
+
+    models_selected = st.multiselect(
+        "🔎 Filter by Model",
+        options=models_all,
+        default=models_all
+    )
+
+    df_filtered = df[df["Model"].isin(models_selected)]
+
+    # =========================
     # DETECT COLUMNS
     # =========================
-    col_ctn = [c for c in df.columns if "CTN" in c.upper()][0]
-    col_nw = [c for c in df.columns if "N W" in c.upper() or "NET" in c.upper()][0]
-    col_gw = [c for c in df.columns if "G W" in c.upper() or "GROSS" in c.upper()][0]
-    col_vol = [c for c in df.columns if "VOLUME" in c.upper() or "CBM" in c.upper()][0]
+    col_ctn = [c for c in df_filtered.columns if "CTN" in c.upper()][0]
+    col_nw = [c for c in df_filtered.columns if "N W" in c.upper() or "NET" in c.upper()][0]
+    col_gw = [c for c in df_filtered.columns if "G W" in c.upper() or "GROSS" in c.upper()][0]
+    col_vol = [c for c in df_filtered.columns if "VOLUME" in c.upper() or "CBM" in c.upper()][0]
 
     # Convert numeric
     for col in [col_ctn, col_nw, col_gw, col_vol]:
-        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+        df_filtered[col] = pd.to_numeric(df_filtered[col], errors="coerce").fillna(0)
 
     # =========================
     # LOT INPUT
     # =========================
     st.subheader("📥 Enter LOT Quantity per Model")
 
-    models = df["Model"].unique()
+    models = df_filtered["Model"].unique()
     lot_qty_dict = {}
 
-    cols = st.columns(len(models))
+    cols = st.columns(len(models) if len(models) > 0 else 1)
 
     for i, model in enumerate(models):
         lot_qty_dict[model] = cols[i].number_input(
@@ -78,7 +91,7 @@ if uploaded_file is not None:
     # =========================
     # GROUPBY
     # =========================
-    result = df.groupby(
+    result = df_filtered.groupby(
         ["Model", "TYPE"], as_index=False
     ).agg({
         col_ctn: "sum",
@@ -98,7 +111,7 @@ if uploaded_file is not None:
     result["LOT QTY"] = result["Model"].map(lot_qty_dict)
 
     # =========================
-    # STYLE TABLE (BORDURES NOIRES)
+    # STYLE TABLE
     # =========================
     def style_table(df):
         return df.style.set_properties(**{
@@ -127,7 +140,7 @@ if uploaded_file is not None:
     col4.metric("📐 Volume", round(result["TOTAL VOLUME (CBM)"].sum(), 3))
 
     # =========================
-    # DOWNLOAD EXCEL ONLY (PRO)
+    # DOWNLOAD EXCEL
     # =========================
     output = BytesIO()
 
