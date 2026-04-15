@@ -121,12 +121,6 @@ if uploaded_file is not None:
     result["LOT QTY"] = result["Model"].map(lot_qty_dict)
 
     # =========================
-    # ADD INFO INTO FILE
-    # =========================
-    result["APNA"] = apna
-    result["Order of Shipment"] = order_shipment
-
-    # =========================
     # STYLE TABLE
     # =========================
     def style_table(df):
@@ -156,10 +150,10 @@ if uploaded_file is not None:
     col4.metric("📐 Volume", round(result["TOTAL VOLUME (CBM)"].sum(), 3))
 
     # =========================
-    # FILE NAME CLEANING
+    # FILE NAME (ONLY HERE APNA + ORDER)
     # =========================
-    safe_apna = apna.replace(" ", "_") if apna else "NO_APNA"
-    safe_order = order_shipment.replace(" ", "_") if order_shipment else "NO_ORDER"
+    safe_apna = apna.strip().replace(" ", "_") if apna else "NO_APNA"
+    safe_order = order_shipment.strip().replace(" ", "_") if order_shipment else "NO_ORDER"
 
     file_name = f"packing_summary_{safe_apna}_{safe_order}.xlsx"
 
