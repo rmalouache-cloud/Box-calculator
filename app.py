@@ -211,8 +211,6 @@ if uploaded_file is not None:
         )
         
         st.success("✅ Fichier chargé avec succès!")
-        
-        
     
     # =========================
     # DÉTECTION DES COLONNES REQUISES
@@ -224,10 +222,9 @@ if uploaded_file is not None:
         st.markdown("""
         <div class="error-text">
             <strong>❌ Colonne 'Model' introuvable</strong><br>
-            Votre fichier doit contenir une colonne pour les modèles (ex: 'Model', 'Modèle', 'Product').<br>
-            Colonnes trouvées : {}
+            Votre fichier doit contenir une colonne pour les modèles (ex: 'Model', 'Modèle', 'Product').
         </div>
-        """.format(', '.join(list(df.columns))), unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
         st.stop()
     
     # Recherche de la colonne TYPE
@@ -237,10 +234,9 @@ if uploaded_file is not None:
         st.markdown("""
         <div class="error-text">
             <strong>❌ Colonne 'TYPE' introuvable</strong><br>
-            Votre fichier doit contenir une colonne pour les types (ex: 'Type', 'Catégorie').<br>
-            Colonnes trouvées : {}
+            Votre fichier doit contenir une colonne pour les types (ex: 'Type', 'Catégorie').
         </div>
-        """.format(', '.join(list(df.columns))), unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
         st.stop()
     
     # Recherche des colonnes numériques
@@ -259,8 +255,7 @@ if uploaded_file is not None:
         st.markdown(f"""
         <div class="error-text">
             <strong>❌ Colonnes manquantes :</strong><br>
-            {', '.join(missing_cols)}<br><br>
-            <strong>Colonnes trouvées :</strong> {', '.join(list(df.columns))}
+            {', '.join(missing_cols)}
         </div>
         """, unsafe_allow_html=True)
         st.stop()
