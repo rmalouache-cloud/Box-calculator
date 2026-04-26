@@ -5,6 +5,8 @@ from PIL import Image
 from openpyxl.styles import PatternFill, Border, Side, Font, Alignment
 import tempfile
 import os
+import time
+import random
 
 # =========================
 # CONFIGURATION DE LA PAGE
@@ -50,6 +52,47 @@ st.markdown("""
     .download-spacing {
         margin-top: 50px;
     }
+    
+    /* Animation des ballons */
+    @keyframes float {
+        0% {
+            transform: translateY(0) rotate(0deg);
+            opacity: 1;
+        }
+        100% {
+            transform: translateY(-100vh) rotate(360deg);
+            opacity: 0;
+        }
+    }
+    
+    .balloon {
+        position: fixed;
+        bottom: -50px;
+        font-size: 30px;
+        pointer-events: none;
+        z-index: 9999;
+        animation: float 3s ease-in forwards;
+    }
+    
+    @keyframes confetti {
+        0% {
+            transform: translateY(0) rotate(0deg);
+            opacity: 1;
+        }
+        100% {
+            transform: translateY(-100vh) rotate(720deg);
+            opacity: 0;
+        }
+    }
+    
+    .confetti {
+        position: fixed;
+        bottom: -10px;
+        font-size: 20px;
+        pointer-events: none;
+        z-index: 9998;
+        animation: confetti 2.5s ease-out forwards;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -59,6 +102,52 @@ COLOR_PALETTE = [
     '#C8E6C9', '#FFCCBC', '#F8BBD9', '#BBDEFB', '#C5E1A5',
     '#FFE0B2', '#D1C4E9', '#B2DFDB', '#F0F4C3', '#FFCDD2'
 ]
+
+# Liste des émojis de ballons
+BALLOON_EMOJIS = ['🎈', '🎈', '🎈', '🎈', '🎈', '🎈', '🎈', '🎈', '🎈', '🎈']
+CONFETTI_EMOJIS = ['✨', '⭐', '🌟', '💫', '🎊', '🎉', '⚡', '💎', '🌸', '⭐']
+
+def show_balloons_animation():
+    """Affiche une animation de ballons colorés qui volent"""
+    
+    # Générer des ballons aléatoires
+    balloon_html = ""
+    for i in range(30):
+        left_pos = random.randint(0, 100)
+        delay = random.uniform(0, 1)
+        size = random.randint(25, 45)
+        emoji = random.choice(BALLOON_EMOJIS)
+        rotation = random.randint(-30, 30)
+        
+        balloon_html += f"""
+        <div class="balloon" style="
+            left: {left_pos}%;
+            animation-delay: {delay}s;
+            font-size: {size}px;
+            transform: rotate({rotation}deg);
+        ">{emoji}</div>
+        """
+    
+    # Ajouter des confettis
+    for i in range(50):
+        left_pos = random.randint(0, 100)
+        delay = random.uniform(0, 1.5)
+        size = random.randint(15, 25)
+        emoji = random.choice(CONFETTI_EMOJIS)
+        
+        balloon_html += f"""
+        <div class="confetti" style="
+            left: {left_pos}%;
+            animation-delay: {delay}s;
+            font-size: {size}px;
+        ">{emoji}</div>
+        """
+    
+    # Afficher l'animation
+    st.markdown(balloon_html, unsafe_allow_html=True)
+    
+    # Jouer l'animation pendant 3 secondes
+    time.sleep(3)
 
 def get_model_color(model_name, model_list):
     """Attribue une couleur unique à chaque modèle"""
@@ -191,6 +280,10 @@ def find_column(df, possible_names):
             if name.lower() in col.lower():
                 return col
     return None
+
+# Initialiser l'état de téléchargement dans session state
+if 'download_clicked' not in st.session_state:
+    st.session_state.download_clicked = False
 
 if uploaded_file is not None:
     
@@ -460,21 +553,31 @@ if uploaded_file is not None:
     os.unlink(temp_path)
     
     # =========================
-    # BOUTON DE TÉLÉCHARGEMENT (AVEC ESPACE)
+    # BOUTON DE TÉLÉCHARGEMENT (AVEC ANIMATION DE BALLONS)
     # =========================
     # Ajout d'espace pour décaler le bouton vers le bas
     st.markdown('<div class="download-spacing"></div>', unsafe_allow_html=True)
     
     col_download1, col_download2, col_download3 = st.columns([1, 2, 1])
     with col_download2:
-        st.download_button(
+        # Bouton de téléchargement avec callback
+        if st.download_button(
             label="📥 Télécharger le rapport Excel",
             data=excel_data,
             file_name=file_name,
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
-            type="primary"
-        )
+            type="primary",
+            key="download_button"
+        ):
+            st.session_state.download_clicked = True
+    
+    # Afficher l'animation si le bouton a été cliqué
+    if st.session_state.download_clicked:
+        show_balloons_animation()
+        # Réinitialiser l'état après l'animation
+        st.session_state.download_clicked = False
+        st.rerun()
     
     # =========================
     # SECTION INFORMATIONS SUPPLÉMENTAIRES
