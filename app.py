@@ -4,6 +4,8 @@ from io import BytesIO
 from PIL import Image
 from openpyxl.styles import PatternFill, Border, Side, Font, Alignment
 from openpyxl.utils.dataframe import dataframe_to_rows
+import tempfile
+import os
 
 # =========================
 # CONFIGURATION DE LA PAGE
@@ -52,7 +54,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Palette de couleurs pour les modèles
+# Palette de couleurs pour les modèles (couleurs pastel)
 COLOR_PALETTE = [
     '#FFE5B4', '#FFD1DC', '#C4E0FA', '#D4F1F9', '#E6E6FA',
     '#C8E6C9', '#FFCCBC', '#F8BBD9', '#BBDEFB', '#C5E1A5',
@@ -61,12 +63,19 @@ COLOR_PALETTE = [
 
 def get_model_color(model_name, model_list):
     """Attribue une couleur unique à chaque modèle"""
-    if model_name in model_list:
-        index = model_list.index(model_name) % len(COLOR_PALETTE)
-        return COLOR_PALETTE[index]
-    return COLOR_PALETTE[0]
+    try:
+        # Convertir en string pour éviter les problèmes de type
+        model_name_str = str(model_name)
+        model_list_str = [str(m) for m in model_list]
+        
+        if model_name_str in model_list_str:
+            index = model_list_str.index(model_name_str) % len(COLOR_PALETTE)
+            return COLOR_PALETTE[index]
+        return COLOR_PALETTE[0]
+    except Exception:
+        return COLOR_PALETTE[0]
 
-def style_excel_with_borders_and_colors(file_path, df_result, model_list):
+def style_excel_with_borders_and_colors(file_path, model_list):
     """Applique des bordures et des couleurs au fichier Excel"""
     from openpyxl import load_workbook
     
@@ -83,9 +92,9 @@ def style_excel_with_borders_and_colors(file_path, df_result, model_list):
     
     # Style pour l'en-tête
     header_font = Font(bold=True, color="FFFFFF")
-    header_fill = PatternFill(start_color="1f77b4", end_color="1f77b4", fill_type="solid")
+    header_fill = PatternFill(start_color="1F77B4", end_color="1F77B4", fill_type="solid")
     
-    # Appliquer les styles
+    # Appliquer les bordures à toutes les cellules
     for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
         for cell in row:
             cell.border = thin_border
@@ -97,17 +106,22 @@ def style_excel_with_borders_and_colors(file_path, df_result, model_list):
                 cell.fill = header_fill
     
     # Appliquer les couleurs par modèle (colonne A = Model)
-    model_colors = {}
-    for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
-        model_value = row[0].value
-        if model_value:
-            if model_value not in model_colors:
-                model_colors[model_value] = get_model_color(model_value, model_list)
-            model_fill = PatternFill(start_color=model_colors[model_value][1:], 
-                                    end_color=model_colors[model_value][1:], 
-                                    fill_type="solid")
-            for cell in row:
-                cell.fill = model_fill
+    # Créer un dictionnaire pour mapper chaque modèle à sa couleur
+    model_color_map = {}
+    for idx, model in enumerate(model_list):
+        model_color_map[str(model)] = get_model_color(model, model_list)
+    
+    # Appliquer les couleurs aux lignes
+    for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+        if row and row[0].value:
+            model_value = str(row[0].value)
+            if model_value in model_color_map:
+                color_hex = model_color_map[model_value]
+                # Convertir la couleur hexadécimale pour openpyxl (sans le #)
+                color_rgb = color_hex.lstrip('#')
+                model_fill = PatternFill(start_color=color_rgb, end_color=color_rgb, fill_type="solid")
+                for cell in row:
+                    cell.fill = model_fill
     
     wb.save(file_path)
 
@@ -191,7 +205,6 @@ if uploaded_file is not None:
         df = pd.read_excel(uploaded_file)
         
         # Nettoyage des noms de colonnes
-        original_columns = df.columns.copy()
         df.columns = (
             df.columns
             .astype(str)
@@ -272,7 +285,7 @@ if uploaded_file is not None:
             st.error("Aucun modèle trouvé dans les données")
             st.stop()
         
-        # Changement : utilisation de selectbox au lieu de multiselect pour n'avoir qu'un seul modèle
+        # Sélection unique du modèle
         selected_model = st.selectbox(
             "🎯 Sélectionner un modèle",
             options=sorted(models_all),
@@ -286,7 +299,7 @@ if uploaded_file is not None:
     # =========================
     st.subheader("📥 Saisie des quantités LOT par type")
     
-    types = df_filtered[col_type].unique()
+    types = df_filtered[col_type].dropna().unique()
     lot_qty_dict = {}
     
     if len(types) > 0:
@@ -337,10 +350,19 @@ if uploaded_file is not None:
     def style_table_with_colors(df):
         """Applique un style professionnel au DataFrame avec couleurs par modèle"""
         # Obtenir la liste des modèles uniques
-        models = df['Model'].unique()
+        models = df['Model'].unique().tolist()
         
-        # Créer le style de base
-        styled = df.style.set_properties(**{
+        # Créer un dictionnaire de styles pour chaque ligne
+        def color_rows(row):
+            model = row['Model']
+            color = get_model_color(model, models)
+            return [f'background-color: {color}' for _ in row]
+        
+        # Appliquer les styles
+        styled = df.style.apply(color_rows, axis=1)
+        
+        # Ajouter les autres styles
+        styled = styled.set_properties(**{
             'border': '1px solid #ddd',
             'text-align': 'center',
             'padding': '8px',
@@ -359,15 +381,6 @@ if uploaded_file is not None:
              'props': [('background-color', '#f5f5f5')]}
         ])
         
-        # Appliquer les couleurs par modèle
-        for model in models:
-            color = get_model_color(model, models)
-            styled = styled.apply(
-                lambda x: [f'background-color: {color}' if x['Model'] == model else '' for _ in x],
-                axis=1,
-                subset=pd.IndexSlice[:, :]
-            )
-        
         # Formater les nombres
         return styled.format({
             'CTN QTY': '{:,.0f}',
@@ -377,7 +390,9 @@ if uploaded_file is not None:
             'LOT QTY': '{:,.0f}'
         })
     
-    st.dataframe(style_table_with_colors(result), use_container_width=True, height=400)
+    # Afficher le tableau stylisé
+    styled_df = style_table_with_colors(result)
+    st.dataframe(styled_df, use_container_width=True, height=400)
     
     # =========================
     # INDICATEURS CLÉS DE PERFORMANCE
@@ -388,40 +403,40 @@ if uploaded_file is not None:
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        st.markdown("""
+        st.markdown(f"""
         <div class="metric-card">
             <h3>📦</h3>
             <h4>Total CTN</h4>
-            <h2>{:,}</h2>
+            <h2>{int(result['CTN QTY'].sum()):,}</h2>
         </div>
-        """.format(int(result["CTN QTY"].sum())), unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
     
     with col2:
-        st.markdown("""
+        st.markdown(f"""
         <div class="metric-card">
             <h3>⚖️</h3>
             <h4>Poids Net</h4>
-            <h2>{:,.2f} kg</h2>
+            <h2>{result['TOTAL N W (KG)'].sum():,.2f} kg</h2>
         </div>
-        """.format(result["TOTAL N W (KG)"].sum()), unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
     
     with col3:
-        st.markdown("""
+        st.markdown(f"""
         <div class="metric-card">
             <h3>⚖️</h3>
             <h4>Poids Brut</h4>
-            <h2>{:,.2f} kg</h2>
+            <h2>{result['TOTAL G W (KG)'].sum():,.2f} kg</h2>
         </div>
-        """.format(result["TOTAL G W (KG)"].sum()), unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
     
     with col4:
-        st.markdown("""
+        st.markdown(f"""
         <div class="metric-card">
             <h3>📐</h3>
             <h4>Volume Total</h4>
-            <h2>{:,.3f} m³</h2>
+            <h2>{result['TOTAL VOLUME (CBM)'].sum():,.3f} m³</h2>
         </div>
-        """.format(result["TOTAL VOLUME (CBM)"].sum()), unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
     
     # =========================
     # PRÉPARATION DU TÉLÉCHARGEMENT
@@ -430,8 +445,12 @@ if uploaded_file is not None:
     safe_order = order_shipment.strip().replace(" ", "_") if order_shipment else "NO_ORDER"
     file_name = f"packing_summary_{safe_apna}_{safe_order}.xlsx"
     
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+    # Créer un fichier temporaire pour l'Excel
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmpfile:
+        temp_path = tmpfile.name
+    
+    # Sauvegarder l'Excel avec styles
+    with pd.ExcelWriter(temp_path, engine='openpyxl') as writer:
         result.to_excel(writer, index=False, sheet_name="Summary")
         
         # Ajout d'une feuille de métadonnées
@@ -440,25 +459,22 @@ if uploaded_file is not None:
             "Valeur": [
                 apna if apna else "N/A", 
                 order_shipment if order_shipment else "N/A",
-                selected_model,
+                str(selected_model),
                 pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S"),
                 f"Model: {col_model}, Type: {col_type}, CTN: {col_ctn}, NW: {col_nw}, GW: {col_gw}, Vol: {col_vol}"
             ]
         })
         metadata.to_excel(writer, index=False, sheet_name="Metadata")
-        
-        # Récupérer le chemin du fichier temporaire pour appliquer les styles
-        temp_path = writer.book.filename
-        
+    
     # Appliquer les styles avec bordures et couleurs
-    if 'temp_path' in locals():
-        style_excel_with_borders_and_colors(temp_path, result, result['Model'].unique())
-        
-        # Lire le fichier modifié
-        with open(temp_path, 'rb') as f:
-            styled_output = BytesIO(f.read())
-    else:
-        styled_output = output
+    style_excel_with_borders_and_colors(temp_path, result['Model'].unique().tolist())
+    
+    # Lire le fichier modifié
+    with open(temp_path, 'rb') as f:
+        excel_data = f.read()
+    
+    # Nettoyer le fichier temporaire
+    os.unlink(temp_path)
     
     # =========================
     # BOUTON DE TÉLÉCHARGEMENT (AVEC ESPACE)
@@ -470,7 +486,7 @@ if uploaded_file is not None:
     with col_download2:
         st.download_button(
             label="📥 Télécharger le rapport Excel",
-            data=styled_output.getvalue() if 'styled_output' in locals() else output.getvalue(),
+            data=excel_data,
             file_name=file_name,
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
