@@ -201,7 +201,6 @@ if uploaded_file is not None:
         df = pd.read_excel(uploaded_file)
         
         # Nettoyage des noms de colonnes
-        original_columns = df.columns.copy()
         df.columns = (
             df.columns
             .astype(str)
@@ -487,14 +486,7 @@ if uploaded_file is not None:
             - Modèles sélectionnés : {', '.join(map(str, models_selected))}<br>
             - Lignes traitées : {len(df_filtered)}<br>
             - Date de génération : {pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")}<br>
-            - Fichier source : {uploaded_file.name}<br>
-            - Colonnes détectées :<br>
-            &nbsp;&nbsp;&nbsp;• Modèle : {col_model}<br>
-            &nbsp;&nbsp;&nbsp;• Type : {col_type}<br>
-            &nbsp;&nbsp;&nbsp;• CTN : {col_ctn}<br>
-            &nbsp;&nbsp;&nbsp;• Poids Net : {col_nw}<br>
-            &nbsp;&nbsp;&nbsp;• Poids Brut : {col_gw}<br>
-            &nbsp;&nbsp;&nbsp;• Volume : {col_vol}
+            - Fichier source : {uploaded_file.name}
         </div>
         """, unsafe_allow_html=True)
 
