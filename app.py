@@ -212,9 +212,7 @@ if uploaded_file is not None:
         
         st.success("✅ Fichier chargé avec succès!")
         
-        # Affichage des colonnes trouvées pour débogage
-        with st.expander("📋 Colonnes trouvées dans le fichier"):
-            st.write("Colonnes disponibles:", list(df.columns))
+        
     
     # =========================
     # DÉTECTION DES COLONNES REQUISES
