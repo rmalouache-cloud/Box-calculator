@@ -228,14 +228,14 @@ if logo_container_exists:
     col1, col2, col3 = st.columns([1.5, 3, 1.5])
     
     with col1:
-        st.image(container_logo, width=120)
+        st.image(container_logo, width=200)
     
     with col2:
-        st.markdown('<div class="main-header">📊 Packing Summary by Model & Type</div>', 
+        st.markdown('<div class="main-header"> Packing Summary by Model & Type</div>', 
                    unsafe_allow_html=True)
     
     with col3:
-        st.image(stream_logo, width=100)
+        st.image(stream_logo, width=200)
 else:
     st.markdown('<div class="main-header">📊 Packing Summary by Model & Type</div>', 
                unsafe_allow_html=True)
