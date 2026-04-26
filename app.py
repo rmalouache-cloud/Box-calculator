@@ -2,6 +2,9 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 from PIL import Image
+from openpyxl.styles import PatternFill, Border, Side, Font, Alignment
+import tempfile
+import os
 
 # =========================
 # CONFIGURATION DE LA PAGE
@@ -44,8 +47,79 @@ st.markdown("""
         border-left: 5px solid #f44336;
         color: #c62828;
     }
+    .download-spacing {
+        margin-top: 50px;
+    }
     </style>
 """, unsafe_allow_html=True)
+
+# Palette de couleurs pour les modèles
+COLOR_PALETTE = [
+    '#FFE5B4', '#FFD1DC', '#C4E0FA', '#D4F1F9', '#E6E6FA',
+    '#C8E6C9', '#FFCCBC', '#F8BBD9', '#BBDEFB', '#C5E1A5',
+    '#FFE0B2', '#D1C4E9', '#B2DFDB', '#F0F4C3', '#FFCDD2'
+]
+
+def get_model_color(model_name, model_list):
+    """Attribue une couleur unique à chaque modèle"""
+    try:
+        model_name_str = str(model_name)
+        model_list_str = [str(m) for m in model_list]
+        
+        if model_name_str in model_list_str:
+            index = model_list_str.index(model_name_str) % len(COLOR_PALETTE)
+            return COLOR_PALETTE[index]
+        return COLOR_PALETTE[0]
+    except Exception:
+        return COLOR_PALETTE[0]
+
+def style_excel_with_borders_and_colors(file_path, model_list):
+    """Applique des bordures et des couleurs par modèle au fichier Excel"""
+    from openpyxl import load_workbook
+    
+    wb = load_workbook(file_path)
+    ws = wb.active
+    
+    # Définir les bordures
+    thin_border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+    
+    # Style pour l'en-tête
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="1F77B4", end_color="1F77B4", fill_type="solid")
+    
+    # Appliquer les bordures à toutes les cellules
+    for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
+        for cell in row:
+            cell.border = thin_border
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            
+            # Style pour l'en-tête
+            if cell.row == 1:
+                cell.font = header_font
+                cell.fill = header_fill
+    
+    # Appliquer les couleurs par modèle
+    model_color_map = {}
+    for idx, model in enumerate(model_list):
+        model_color_map[str(model)] = get_model_color(model, model_list)
+    
+    # Colorier les lignes selon le modèle (colonne A)
+    for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+        if row and row[0].value:
+            model_value = str(row[0].value)
+            if model_value in model_color_map:
+                color_hex = model_color_map[model_value]
+                color_rgb = color_hex.lstrip('#')
+                model_fill = PatternFill(start_color=color_rgb, end_color=color_rgb, fill_type="solid")
+                for cell in row:
+                    cell.fill = model_fill
+    
+    wb.save(file_path)
 
 # =========================
 # CHARGEMENT DES LOGOS
@@ -265,13 +339,23 @@ if uploaded_file is not None:
         result["LOT QTY"] = result["Model"].map(lot_qty_dict)
     
     # =========================
-    # AFFICHAGE DU TABLEAU STYLISÉ
+    # AFFICHAGE DU TABLEAU STYLISÉ AVEC COULEURS
     # =========================
     st.subheader("📦 Résumé détaillé")
     
-    def style_table(df):
-        """Applique un style professionnel au DataFrame"""
-        return df.style.set_properties(**{
+    def style_table_with_colors(df):
+        """Applique un style professionnel au DataFrame avec couleurs par modèle"""
+        models_list = df['Model'].unique().tolist()
+        
+        # Fonction pour colorer les lignes selon le modèle
+        def color_rows(row):
+            model = row['Model']
+            color = get_model_color(model, models_list)
+            return [f'background-color: {color}' for _ in row]
+        
+        # Appliquer les couleurs et le style
+        styled = df.style.apply(color_rows, axis=1)
+        styled = styled.set_properties(**{
             'border': '1px solid #ddd',
             'text-align': 'center',
             'padding': '8px',
@@ -288,7 +372,10 @@ if uploaded_file is not None:
              ]},
             {'selector': 'tbody tr:hover',
              'props': [('background-color', '#f5f5f5')]}
-        ]).format({
+        ])
+        
+        # Formater les nombres
+        return styled.format({
             'CTN QTY': '{:,.0f}',
             'TOTAL N W (KG)': '{:,.2f}',
             'TOTAL G W (KG)': '{:,.2f}',
@@ -296,7 +383,8 @@ if uploaded_file is not None:
             'LOT QTY': '{:,.0f}'
         })
     
-    st.dataframe(style_table(result), use_container_width=True, height=400)
+    # Afficher le tableau avec couleurs
+    st.dataframe(style_table_with_colors(result), use_container_width=True, height=400)
     
     # =========================
     # INDICATEURS CLÉS DE PERFORMANCE
@@ -307,50 +395,54 @@ if uploaded_file is not None:
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        st.markdown("""
+        st.markdown(f"""
         <div class="metric-card">
             <h3>📦</h3>
             <h4>Total CTN</h4>
-            <h2>{:,}</h2>
+            <h2>{int(result['CTN QTY'].sum()):,}</h2>
         </div>
-        """.format(int(result["CTN QTY"].sum())), unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
     
     with col2:
-        st.markdown("""
+        st.markdown(f"""
         <div class="metric-card">
             <h3>⚖️</h3>
             <h4>Poids Net</h4>
-            <h2>{:,.2f} kg</h2>
+            <h2>{result['TOTAL N W (KG)'].sum():,.2f} kg</h2>
         </div>
-        """.format(result["TOTAL N W (KG)"].sum()), unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
     
     with col3:
-        st.markdown("""
+        st.markdown(f"""
         <div class="metric-card">
             <h3>⚖️</h3>
             <h4>Poids Brut</h4>
-            <h2>{:,.2f} kg</h2>
+            <h2>{result['TOTAL G W (KG)'].sum():,.2f} kg</h2>
         </div>
-        """.format(result["TOTAL G W (KG)"].sum()), unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
     
     with col4:
-        st.markdown("""
+        st.markdown(f"""
         <div class="metric-card">
             <h3>📐</h3>
             <h4>Volume Total</h4>
-            <h2>{:,.3f} m³</h2>
+            <h2>{result['TOTAL VOLUME (CBM)'].sum():,.3f} m³</h2>
         </div>
-        """.format(result["TOTAL VOLUME (CBM)"].sum()), unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
     
     # =========================
-    # PRÉPARATION DU TÉLÉCHARGEMENT
+    # PRÉPARATION DU TÉLÉCHARGEMENT (AVEC BORDURES ET COULEURS)
     # =========================
     safe_apna = apna.strip().replace(" ", "_") if apna else "NO_APNA"
     safe_order = order_shipment.strip().replace(" ", "_") if order_shipment else "NO_ORDER"
     file_name = f"packing_summary_{safe_apna}_{safe_order}.xlsx"
     
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+    # Créer un fichier temporaire
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmpfile:
+        temp_path = tmpfile.name
+    
+    # Sauvegarder l'Excel
+    with pd.ExcelWriter(temp_path, engine='openpyxl') as writer:
         result.to_excel(writer, index=False, sheet_name="Summary")
         
         # Ajout d'une feuille de métadonnées
@@ -365,17 +457,31 @@ if uploaded_file is not None:
         })
         metadata.to_excel(writer, index=False, sheet_name="Metadata")
     
+    # Appliquer les bordures et couleurs au fichier Excel
+    style_excel_with_borders_and_colors(temp_path, result['Model'].unique().tolist())
+    
+    # Lire le fichier modifié
+    with open(temp_path, 'rb') as f:
+        excel_data = f.read()
+    
+    # Nettoyer le fichier temporaire
+    os.unlink(temp_path)
+    
     # =========================
-    # BOUTON DE TÉLÉCHARGEMENT
+    # BOUTON DE TÉLÉCHARGEMENT (AVEC ESPACE)
     # =========================
+    # Ajout d'espace pour décaler le bouton vers le bas
+    st.markdown('<div class="download-spacing"></div>', unsafe_allow_html=True)
+    
     col_download1, col_download2, col_download3 = st.columns([1, 2, 1])
     with col_download2:
         st.download_button(
             label="📥 Télécharger le rapport Excel",
-            data=output.getvalue(),
+            data=excel_data,
             file_name=file_name,
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True
+            use_container_width=True,
+            type="primary"
         )
     
     # =========================
